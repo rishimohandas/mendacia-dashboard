@@ -1,0 +1,81 @@
+{
+  "video_id": "mock-video-001",
+  "transcript": [
+    {
+      "start": 0.0,
+      "end": 18.0,
+      "text": "The city is in total chaos and violence is everywhere according to this report."
+    },
+    {
+      "start": 18.0,
+      "end": 40.0,
+      "text": "Viewers must act now because the crisis is escalating rapidly."
+    },
+    {
+      "start": 40.0,
+      "end": 70.0,
+      "text": "Officials said there are organized marches downtown with police nearby."
+    },
+    {
+      "start": 70.0,
+      "end": 110.0,
+      "text": "This is the only possible outcome unless immediate intervention happens."
+    }
+  ],
+  "scenes": [
+    {
+      "scene_number": 1,
+      "start_time": 0.0,
+      "end_time": 35.0,
+      "visual_summary": "Organized march with calm crowd movement and police vehicle visible.",
+      "spoken_transcript": "The city is in total chaos and violence is everywhere according to this report.",
+      "detected_objects": ["crowd", "police vehicle", "banners"]
+    },
+    {
+      "scene_number": 2,
+      "start_time": 35.0,
+      "end_time": 80.0,
+      "visual_summary": "Calm street interview, no visible destruction.",
+      "spoken_transcript": "Viewers must act now because the crisis is escalating rapidly.",
+      "detected_objects": ["reporter", "microphone", "street"]
+    },
+    {
+      "scene_number": 3,
+      "start_time": 80.0,
+      "end_time": 140.0,
+      "visual_summary": "Smoke and isolated fire appear in background while speaker maintains neutral tone.",
+      "spoken_transcript": "Officials said there are organized marches downtown with police nearby.",
+      "detected_objects": ["smoke", "fire", "road barrier"]
+    }
+  ],
+  "semantic_moments": [
+    {
+      "query": "Where does the speaker make a strong claim?",
+      "start": 6.0,
+      "end": 16.0,
+      "text": "The city is in total chaos and violence is everywhere.",
+      "scene_number": 1
+    },
+    {
+      "query": "Where does the tone become urgent or fearful?",
+      "start": 20.0,
+      "end": 35.0,
+      "text": "Viewers must act now because the crisis is escalating rapidly.",
+      "scene_number": 2
+    },
+    {
+      "query": "Where are crowds, police, or conflict visible?",
+      "start": 0.0,
+      "end": 30.0,
+      "text": "Organized march with police nearby.",
+      "scene_number": 1
+    },
+    {
+      "query": "Where is on-screen text reinforcing a message?",
+      "start": 48.0,
+      "end": 58.0,
+      "text": "Breaking Crisis Update text overlay appears.",
+      "scene_number": 2
+    }
+  ]
+}
