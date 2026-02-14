@@ -1,5 +1,7 @@
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
+
+from pydantic import BaseModel, Field
+
 
 class SceneMetadata(BaseModel):
     scene_number: int
@@ -9,16 +11,45 @@ class SceneMetadata(BaseModel):
     spoken_transcript: str
     detected_objects: List[str]
 
+
 class MismatchFlag(BaseModel):
     timestamp: float
-    flag_type: str 
+    flag_type: str
     description: str
-    severity: str 
+    severity: str
+
 
 class ForensicReport(BaseModel):
     video_id: str
-    confidence_score: int 
-    classification: str 
-    manipulation_categories_detected: List[str] 
+    confidence_score: int
+    classification: str
+    manipulation_categories_detected: List[str]
     scenes: List[SceneMetadata]
+    inconsistency_flags: List[MismatchFlag]
+
+
+class ModuleARationale(BaseModel):
+    category: str
+    evidence: str
+    why: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class ModuleAResult(BaseModel):
+    manipulation_categories_detected: List[str]
+    rationales: List[ModuleARationale]
+
+
+class ClaimItem(BaseModel):
+    id: str
+    text: str
+    timestamp_range: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class ModuleBResult(BaseModel):
+    claims: List[ClaimItem]
+
+
+class ModuleCResult(BaseModel):
     inconsistency_flags: List[MismatchFlag]

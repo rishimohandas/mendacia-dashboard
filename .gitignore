@@ -1,1 +1,14 @@
 .env
+backend/.env
+.DS_Store
+backend/.venv/
+__pycache__/
+backend/.DS_Store
+backend/mock/*.mp4
+backend/mock/*.mov
+backend/mock/*.mkv
+backend/mock/*.webm
+backend/uploads/*.mp4
+backend/uploads/*.mov
+backend/uploads/*.mkv
+backend/uploads/*.webm
