@@ -1,9 +1,42 @@
+import { useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 import { Play, Sparkles, Shield, Database, Zap } from "lucide-react";
+import { uploadVideo } from "../../services/api";
 import { Button } from "../components/ui/button";
 
 export function HomePage() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const openFilePicker = () => {
+    if (isUploading) {
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { job_id } = await uploadVideo(file);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mendacia:lastJobId", job_id);
+      }
+      navigate(`/forensic-lab?jobId=${encodeURIComponent(job_id)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload failed. Please try again.";
+      window.alert(message);
+    } finally {
+      setIsUploading(false);
+      event.target.value = "";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#020617] relative overflow-hidden">
@@ -119,7 +152,18 @@ export function HomePage() {
                 <div className="absolute -inset-1 bg-gradient-to-r from-[#22d3ee] via-[#22d3ee] to-[#22d3ee] rounded-2xl opacity-20 blur-xl group-hover:opacity-40 transition-opacity" />
                 
                 {/* Drop Zone */}
-                <div className="relative bg-[#1e293b]/30 backdrop-blur-xl border-2 border-dashed border-[#22d3ee]/50 rounded-2xl p-16 text-center group-hover:border-[#22d3ee] transition-all">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={openFilePicker}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openFilePicker();
+                    }
+                  }}
+                  className="relative bg-[#1e293b]/30 backdrop-blur-xl border-2 border-dashed border-[#22d3ee]/50 rounded-2xl p-16 text-center group-hover:border-[#22d3ee] transition-all cursor-pointer"
+                >
                   {/* Pulsing Scan Effect */}
                   <div className="absolute inset-0 bg-gradient-to-b from-[#22d3ee]/0 via-[#22d3ee]/10 to-[#22d3ee]/0 animate-pulse rounded-2xl" />
                   
@@ -148,12 +192,16 @@ export function HomePage() {
                     </div>
 
                     <Button
-                      onClick={() => navigate("/citizen-view")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openFilePicker();
+                      }}
+                      disabled={isUploading}
                       className="bg-[#22d3ee] hover:bg-[#22d3ee]/90 text-[#020617] px-8 py-6 text-lg font-bold rounded-lg transition-all hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] relative overflow-hidden group"
                     >
                       <span className="relative z-10 flex items-center gap-2">
                         <Play className="h-5 w-5" />
-                        View Media Safety Analysis
+                        {isUploading ? "Uploading..." : "View Media Safety Analysis"}
                       </span>
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                     </Button>
@@ -163,6 +211,13 @@ export function HomePage() {
                     </p>
                   </div>
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/mp4"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                />
               </div>
 
               {/* Processing Steps */}
