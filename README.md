@@ -1,6 +1,8 @@
 # Mendacia Dashboard
 
-Mendacia is a multimodal media forensics dashboard.
+Mendacia is a multimodal media forensics dashboard. It Analyzes video/text inputs and provides detailed evidence of manipulative and deceptive media. Designed to show how the media you consume affects your perception. 
+
+
 Current repo status: backend MVP is implemented and frontend can now integrate against stable endpoints.
 
 ## Current State
