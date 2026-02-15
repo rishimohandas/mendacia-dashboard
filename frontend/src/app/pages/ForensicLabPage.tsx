@@ -267,6 +267,7 @@ export function ForensicLabPage() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [activeMetric, setActiveMetric] = useState<string | null>(null);
 
   useEffect(() => {
     if (!jobId || typeof window === "undefined") {
@@ -581,6 +582,24 @@ export function ForensicLabPage() {
     doc.save(`${payload.video_id || "forensic-report"}-report.pdf`);
   };
 
+  const metricDetails: Record<string, { title: string; description: string }> = {
+    manipulation: {
+      title: "Manipulation %",
+      description:
+        "Derived from the backend confidence score. It blends inconsistency severity, category count, and rationale confidence to estimate manipulation likelihood.",
+    },
+    credibility: {
+      title: "Credibility %",
+      description:
+        "Computed as 100 - manipulation score. Higher credibility indicates fewer manipulation signals detected in this report.",
+    },
+    synthesis: {
+      title: "Synthesis Score",
+      description:
+        "Aggregated signal strength across category magnitudes and anomaly severity. It summarizes how strong and consistent the detected signals are.",
+    },
+  };
+
   return (
     <div className="min-h-screen bg-[#020617] relative overflow-hidden">
       {/* Grid Background */}
@@ -662,6 +681,9 @@ export function ForensicLabPage() {
                     color: "#e2e8f0",
                     fontFamily: "monospace",
                   }}
+                  labelStyle={{ color: "#e2e8f0" }}
+                  itemStyle={{ color: "#e2e8f0" }}
+                  formatter={(value) => [`${value}%`, "Magnitude"]}
                 />
                 <Bar dataKey="magnitude" radius={[6, 6, 0, 0]}>
                   {categoryMagnitudeData.map((entry) => (
@@ -672,16 +694,27 @@ export function ForensicLabPage() {
             </ResponsiveContainer>
             <div className="grid grid-cols-3 gap-3 mt-4">
               {[
-                { label: "Manipulation %", value: manipulationScore, color: verdictTone.text },
-                { label: "Credibility %", value: credibilityScore, color: "text-cyan-300" },
-                { label: "Synthesis Score", value: synthesisScore, color: "text-purple-300" },
+                { key: "manipulation", label: "Manipulation %", value: manipulationScore, color: verdictTone.text },
+                { key: "credibility", label: "Credibility %", value: credibilityScore, color: "text-cyan-300" },
+                { key: "synthesis", label: "Synthesis Score", value: synthesisScore, color: "text-purple-300" },
               ].map((item) => (
-                <div key={item.label} className="bg-slate-800/50 rounded-lg p-3 text-center">
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveMetric((prev) => (prev === item.key ? null : item.key))}
+                  className="bg-slate-800/50 rounded-lg p-3 text-center border border-transparent hover:border-slate-500/60 hover:bg-slate-800/70 transition-colors"
+                >
                   <div className={`text-2xl font-bold mb-1 ${item.color}`}>{Math.round(item.value)}%</div>
                   <div className="text-xs text-slate-400 font-mono">{item.label}</div>
-                </div>
+                </button>
               ))}
             </div>
+            {activeMetric ? (
+              <div className="mt-4 rounded-xl border border-slate-700/60 bg-[#0f172a]/70 p-4">
+                <p className="text-sm text-slate-200 font-semibold mb-1">{metricDetails[activeMetric].title}</p>
+                <p className="text-xs text-slate-400 leading-relaxed">{metricDetails[activeMetric].description}</p>
+              </div>
+            ) : null}
           </div>
 
           {/* Manipulation Taxonomy */}

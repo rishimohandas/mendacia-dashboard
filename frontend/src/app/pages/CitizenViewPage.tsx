@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { AlertCircle, ArrowRight, CheckCircle2, Shield, ChevronLeft } from "lucide-react";
+import { AlertCircle, CheckCircle2, Shield, ChevronLeft } from "lucide-react";
 import { fetchAnalysis, pollJobStatus } from "../../services/api";
 import type { ForensicReport } from "../../services/adapter";
 import { Button } from "../components/ui/button";
 
 const LAST_JOB_ID_STORAGE_KEY = "mendacia:lastJobId";
+const LAST_FILENAME_STORAGE_KEY = "mendacia:lastFilename";
 
 function clamp(value: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function formatLabel(label: string): string {
-  return label
-    .split(/[^a-zA-Z0-9]+/g)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 type ScoreTone = {
@@ -173,7 +166,6 @@ export function CitizenViewPage() {
   const scoreColor = scoreTone.text;
   const gaugeNeedleScore = clamp(confidenceScore);
   const credibilityScore = clamp(100 - confidenceScore);
-  const formattedClassification = formatLabel(report?.classification.label ?? "Unknown");
   const categories = report?.manipulation.categories ?? [];
   const flags = report?.anomalies ?? [];
   const synthesisScore = useMemo(() => {
@@ -200,6 +192,25 @@ export function CitizenViewPage() {
   }, [confidenceScore, flags.length, report]);
 
   const reportText = report?.human_readable_report?.trim() || "No human-readable report available.";
+  const videoFilename = useMemo(() => {
+    const candidate = report?.metadata.filename?.trim();
+    if (candidate && candidate !== "Unknown Video") {
+      return candidate;
+    }
+    if (typeof window !== "undefined") {
+      const jobFilename = activeJobId
+        ? window.localStorage.getItem(`mendacia:jobFilename:${activeJobId}`)
+        : null;
+      if (jobFilename) {
+        return jobFilename;
+      }
+      const lastFilename = window.localStorage.getItem(LAST_FILENAME_STORAGE_KEY);
+      if (lastFilename) {
+        return lastFilename;
+      }
+    }
+    return report?.metadata.video_id || "No report loaded";
+  }, [activeJobId, report?.metadata.filename, report?.metadata.video_id]);
   const forensicPath = activeJobId ? `/forensic-lab?jobId=${encodeURIComponent(activeJobId)}` : "/forensic-lab";
 
   return (
@@ -230,13 +241,6 @@ export function CitizenViewPage() {
                 </div>
               </div>
             </div>
-            <Button
-              onClick={() => navigate(forensicPath)}
-              className="bg-[#22d3ee]/10 hover:bg-[#22d3ee]/20 text-[#22d3ee] border border-[#22d3ee]/30"
-            >
-              View Detailed Analytics
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
           </div>
         </div>
       </header>
@@ -265,11 +269,10 @@ export function CitizenViewPage() {
           <div className="text-center mb-12">
             <div className="inline-block bg-[#1e293b]/50 backdrop-blur-sm border border-slate-700/50 rounded-lg px-6 py-3 mb-4">
               <p className="text-sm text-slate-400 font-mono">
-                {report?.metadata.filename || report?.metadata.video_id || "No report loaded"}
+                {videoFilename}
               </p>
             </div>
             <h2 className="text-3xl font-bold text-white mb-2">Media Safety Analysis</h2>
-            <p className="text-slate-400">Simple breakdown for everyone</p>
           </div>
 
           {/* Trust Gauge - The Hero Element */}
