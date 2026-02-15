@@ -12,3 +12,5 @@ backend/uploads/*.mp4
 backend/uploads/*.mov
 backend/uploads/*.mkv
 backend/uploads/*.webm
+node_modules/
+frontend/node_modules/
