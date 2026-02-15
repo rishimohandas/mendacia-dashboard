@@ -1,6 +1,6 @@
 # Mendacia Dashboard
 
-Mendacia (SIREN) is a multimodal media forensics dashboard.
+Mendacia is a multimodal media forensics dashboard.
 Current repo status: backend MVP is implemented and frontend can now integrate against stable endpoints.
 
 ## Current State
