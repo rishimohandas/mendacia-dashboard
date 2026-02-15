@@ -1,13 +1,14 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 import { Play, Sparkles, Shield, Database, Zap } from "lucide-react";
-import { uploadVideo } from "../../services/api";
+import { uploadEvidence, uploadTextContent } from "../../services/api";
 import { Button } from "../components/ui/button";
 
 export function HomePage() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [textInput, setTextInput] = useState("");
 
   const openFilePicker = () => {
     if (isUploading) {
@@ -24,7 +25,7 @@ export function HomePage() {
 
     setIsUploading(true);
     try {
-      const { job_id } = await uploadVideo(file);
+      const { job_id } = await uploadEvidence(file);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("mendacia:lastJobId", job_id);
         window.localStorage.setItem(`mendacia:jobFilename:${job_id}`, file.name);
@@ -37,6 +38,27 @@ export function HomePage() {
     } finally {
       setIsUploading(false);
       event.target.value = "";
+    }
+  };
+
+  const handleTextSubmit = async () => {
+    const payload = textInput.trim();
+    if (!payload || isUploading) {
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { job_id } = await uploadTextContent(payload);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mendacia:lastJobId", job_id);
+      }
+      navigate(`/citizen-view?jobId=${encodeURIComponent(job_id)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload failed. Please try again.";
+      window.alert(message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -148,7 +170,7 @@ export function HomePage() {
                 </div>
               </div>
 
-              {/* Main Upload Drop Zone */}
+              {/* Main Upload + Text Input */}
               <div className="relative group">
                 {/* Glow Effect */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-[#22d3ee] via-[#22d3ee] to-[#22d3ee] rounded-2xl opacity-20 blur-xl group-hover:opacity-40 transition-opacity" />
@@ -179,7 +201,7 @@ export function HomePage() {
                       Upload a file below
                     </h3>
                     <p className="text-lg text-slate-400 mb-8 font-mono">
-                      Drag & Drop Video Evidence • MP4 • MOV • PDF • TXT
+                      Upload Evidence • MP4 • PDF • TXT
                     </p>
 
                     <div className="flex items-center justify-center gap-6 mb-8">
@@ -216,10 +238,34 @@ export function HomePage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="video/mp4"
+                  accept=".mp4,.pdf,.txt,video/mp4,application/pdf,text/plain"
                   className="hidden"
                   onChange={handleFileSelected}
                 />
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-slate-700/50 bg-[#1e293b]/40 backdrop-blur-xl p-6">
+                <h4 className="text-white font-semibold mb-2">Or Paste Text Directly</h4>
+                <p className="text-xs text-slate-400 font-mono mb-3">
+                  Submit article text, transcript snippets, or claims without uploading a file.
+                </p>
+                <textarea
+                  value={textInput}
+                  onChange={(event) => setTextInput(event.target.value)}
+                  disabled={isUploading}
+                  placeholder="Paste text to analyze..."
+                  rows={6}
+                  className="w-full rounded-lg border border-slate-700 bg-[#020617]/70 text-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#22d3ee]/40"
+                />
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    onClick={handleTextSubmit}
+                    disabled={isUploading || !textInput.trim()}
+                    className="bg-[#22d3ee] hover:bg-[#22d3ee]/90 text-[#020617] font-semibold"
+                  >
+                    {isUploading ? "Submitting..." : "Analyze Pasted Text"}
+                  </Button>
+                </div>
               </div>
 
               {/* Processing Steps */}

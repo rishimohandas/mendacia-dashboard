@@ -1,9 +1,8 @@
-import os
 import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_file
@@ -19,7 +18,8 @@ for env_path in (BASE_DIR / ".env", BASE_DIR.parent / ".env"):
     if env_path.exists():
         load_dotenv(env_path, override=False)
 
-ALLOWED_EXTENSIONS = {"mp4"}
+ALLOWED_VIDEO_EXTENSIONS = {"mp4"}
+ALLOWED_DOCUMENT_EXTENSIONS = {"txt", "pdf"}
 DEFAULT_DURATION_SECONDS = 150
 MAX_DURATION_SECONDS = 180
 
@@ -44,16 +44,28 @@ jobs_lock = threading.Lock()
 pipeline_service = PipelineService()
 
 
-def _allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+def _file_extension(filename: str) -> str:
+    if "." not in filename:
+        return ""
+    return filename.rsplit(".", 1)[1].lower()
 
 
-def _new_job_record(video_path: str) -> Dict[str, Any]:
+def _allowed_video_file(filename: str) -> bool:
+    return _file_extension(filename) in ALLOWED_VIDEO_EXTENSIONS
+
+
+def _allowed_document_file(filename: str) -> bool:
+    return _file_extension(filename) in ALLOWED_DOCUMENT_EXTENSIONS
+
+
+def _new_job_record(input_type: str, input_path: Optional[str]) -> Dict[str, Any]:
     return {
         "status": "queued",
         "progress": 0,
         "message": "Queued for processing",
-        "video_path": video_path,
+        "input_type": input_type,
+        "input_path": input_path,
+        "video_path": input_path if input_type == "video" else None,
         "twelvelabs_raw": None,
         "normalized_metadata": None,
         "moduleA_result": None,
@@ -82,10 +94,12 @@ def _process_job(job_id: str, context_text: str, duration_seconds: int) -> None:
     try:
         _set_job(job_id, status="processing", progress=5, message="Job started")
         with jobs_lock:
-            video_path = jobs[job_id]["video_path"]
+            input_type = str(jobs[job_id].get("input_type") or "video")
+            input_path = jobs[job_id].get("input_path")
 
         result = pipeline_service.run(
-            video_path=video_path,
+            input_type=input_type,
+            input_path=input_path,
             context_text=context_text,
             duration_seconds=duration_seconds,
             progress_callback=_job_progress_callback(job_id),
@@ -115,17 +129,8 @@ def _process_job(job_id: str, context_text: str, duration_seconds: int) -> None:
 
 @app.route("/api/upload", methods=["POST"])
 def upload_video():
-    if "video" not in request.files:
-        return jsonify({"error": "Missing video file"}), 400
-
-    video = request.files["video"]
-    if not video or not video.filename:
-        return jsonify({"error": "Invalid video file"}), 400
-
-    if not _allowed_file(video.filename):
-        return jsonify({"error": "Only mp4 files are supported"}), 400
-
     context_text = request.form.get("context_text", "")
+    text_content = request.form.get("text_content", "")
     try:
         duration_seconds = int(request.form.get("duration_seconds", DEFAULT_DURATION_SECONDS))
     except ValueError:
@@ -136,13 +141,41 @@ def upload_video():
 
     job_id = str(uuid.uuid4())
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    safe_name = secure_filename(video.filename)
-    filename = f"{job_id}_{timestamp}_{safe_name}"
-    video_path = str((UPLOAD_DIR / filename).resolve())
-    video.save(video_path)
+    input_type = ""
+    input_path: Optional[str] = None
+
+    video = request.files.get("video")
+    if video and video.filename:
+        if not _allowed_video_file(video.filename):
+            return jsonify({"error": "Only mp4 files are supported for video uploads"}), 400
+        safe_name = secure_filename(video.filename)
+        filename = f"{job_id}_{timestamp}_{safe_name}"
+        saved_path = (UPLOAD_DIR / filename).resolve()
+        video.save(str(saved_path))
+        input_type = "video"
+        input_path = str(saved_path)
+    else:
+        document = request.files.get("document")
+        if document and document.filename:
+            if not _allowed_document_file(document.filename):
+                return jsonify({"error": "Only txt and pdf files are supported for document uploads"}), 400
+            safe_name = secure_filename(document.filename)
+            filename = f"{job_id}_{timestamp}_{safe_name}"
+            saved_path = (UPLOAD_DIR / filename).resolve()
+            document.save(str(saved_path))
+            input_type = "pdf" if _file_extension(safe_name) == "pdf" else "text"
+            input_path = str(saved_path)
+        elif text_content.strip():
+            filename = f"{job_id}_{timestamp}_inline.txt"
+            saved_path = (UPLOAD_DIR / filename).resolve()
+            saved_path.write_text(text_content.strip(), encoding="utf-8")
+            input_type = "text"
+            input_path = str(saved_path)
+        else:
+            return jsonify({"error": "Provide one of: video (mp4), document (txt/pdf), or text_content"}), 400
 
     with jobs_lock:
-        jobs[job_id] = _new_job_record(video_path)
+        jobs[job_id] = _new_job_record(input_type=input_type, input_path=input_path)
 
     worker = threading.Thread(
         target=_process_job,
@@ -197,6 +230,9 @@ def get_uploaded_video(job_id: str):
         job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
+
+    if job.get("input_type") != "video":
+        return jsonify({"error": "No uploaded video for this job"}), 404
 
     video_path = job.get("video_path")
     if not video_path or not Path(video_path).exists():

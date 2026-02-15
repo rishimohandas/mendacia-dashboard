@@ -3,6 +3,7 @@
 Implementation note:
 - All module outputs are strict JSON and validated through Pydantic models.
 - If external metadata is sparse, backend preserves schema validity using conservative fallback values.
+- Text/PDF uploads are normalized into transcript/scenes with text-derived summaries and no visual objects.
 
 ## Module A: Manipulation Taxonomy Classifier
 Input keys:

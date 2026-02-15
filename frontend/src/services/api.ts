@@ -57,12 +57,41 @@ function getJobId(payload: unknown): string {
 }
 
 export async function uploadVideo(file: File): Promise<{ job_id: string }> {
-  if (!(file instanceof File)) {
-    throw new Error("Upload failed: a valid video file is required.");
+  return uploadEvidence(file);
+}
+
+function resolveUploadField(file: File): "video" | "document" {
+  const name = (file.name || "").toLowerCase();
+  const type = (file.type || "").toLowerCase();
+
+  const isPdf = name.endsWith(".pdf") || type === "application/pdf";
+  const isText = name.endsWith(".txt") || type.startsWith("text/");
+  if (isPdf || isText) {
+    return "document";
   }
+  return "video";
+}
+
+function validateUploadFile(file: File): void {
+  const name = (file.name || "").toLowerCase();
+  const type = (file.type || "").toLowerCase();
+
+  const isMp4 = name.endsWith(".mp4") || type === "video/mp4";
+  const isPdf = name.endsWith(".pdf") || type === "application/pdf";
+  const isText = name.endsWith(".txt") || type.startsWith("text/");
+  if (!isMp4 && !isPdf && !isText) {
+    throw new Error("Upload failed: only .mp4, .pdf, or .txt files are supported.");
+  }
+}
+
+export async function uploadEvidence(file: File): Promise<{ job_id: string }> {
+  if (!(file instanceof File)) {
+    throw new Error("Upload failed: a valid file is required.");
+  }
+  validateUploadFile(file);
 
   const formData = new FormData();
-  formData.append("video", file);
+  formData.append(resolveUploadField(file), file);
 
   let response: Response;
   try {
@@ -88,7 +117,38 @@ export async function uploadVideo(file: File): Promise<{ job_id: string }> {
   return { job_id: jobId };
 }
 
-export async function pollJobStatus(jobId: string): Promise<{ status: string }> {
+export async function uploadTextContent(text: string): Promise<{ job_id: string }> {
+  const payload = text.trim();
+  if (!payload) {
+    throw new Error("Upload failed: text input cannot be empty.");
+  }
+
+  const formData = new FormData();
+  formData.append("text_content", payload);
+
+  let response: Response;
+  try {
+    response = await fetch(buildUrl("/api/upload"), {
+      method: "POST",
+      body: formData,
+    });
+  } catch {
+    throw new Error("Upload failed: unable to reach backend API.");
+  }
+
+  const body = await readJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(errorMessageFromPayload(body, "Upload request failed."));
+  }
+
+  const jobId = getJobId(body);
+  if (!jobId) {
+    throw new Error("Upload failed: backend response did not include job_id.");
+  }
+  return { job_id: jobId };
+}
+
+export async function pollJobStatus(jobId: string): Promise<{ status: string; message: string }> {
   const normalizedJobId = jobId?.trim();
   if (!normalizedJobId) {
     throw new Error("Polling failed: jobId is required.");
@@ -111,8 +171,9 @@ export async function pollJobStatus(jobId: string): Promise<{ status: string }> 
 
   const record = isRecord(payload) ? payload : {};
   const status = typeof record.status === "string" && record.status.trim() ? record.status : "unknown";
+  const message = typeof record.message === "string" ? record.message : "";
 
-  return { status };
+  return { status, message };
 }
 
 export async function fetchAnalysis(jobId: string): Promise<ForensicReport> {

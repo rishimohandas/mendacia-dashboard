@@ -304,12 +304,12 @@ export function ForensicLabPage() {
 
       isRequestInFlight = true;
       try {
-        const { status } = await pollJobStatus(jobId);
+        const { status, message } = await pollJobStatus(jobId);
         const normalizedStatus = status.toLowerCase();
-        setStatusText(`Analysis status: ${status}`);
+        setStatusText(message ? `Analysis status: ${status} - ${message}` : `Analysis status: ${status}`);
 
         if (failedStatuses.has(normalizedStatus)) {
-          throw new Error(`Analysis failed with status: ${status}`);
+          throw new Error(message ? `Analysis failed: ${message}` : `Analysis failed with status: ${status}`);
         }
 
         if (completedStatuses.has(normalizedStatus)) {
