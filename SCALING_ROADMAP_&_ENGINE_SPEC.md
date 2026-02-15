@@ -1,7 +1,7 @@
-# TruthLens Backend Handoff (Hackathon Team)
+# Mendacia Backend Handoff (Hackathon Team)
 
 ## Purpose
-This file is a quick handoff for teammates to continue backend work safely and consistently.
+This file is a quick handoff to continue backend work safely and consistently.
 
 ## Current Backend Flow
 1. `POST /api/upload` accepts one MP4 and creates an in-memory `job_id`.
