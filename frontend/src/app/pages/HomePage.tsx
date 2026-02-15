@@ -28,7 +28,7 @@ export function HomePage() {
       if (typeof window !== "undefined") {
         window.localStorage.setItem("mendacia:lastJobId", job_id);
       }
-      navigate(`/forensic-lab?jobId=${encodeURIComponent(job_id)}`);
+      navigate(`/citizen-view?jobId=${encodeURIComponent(job_id)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed. Please try again.";
       window.alert(message);

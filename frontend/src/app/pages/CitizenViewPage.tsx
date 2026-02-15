@@ -19,17 +19,40 @@ function formatLabel(label: string): string {
     .join(" ");
 }
 
-function scoreColorClass(score: number): string {
-  if (score >= 75) {
-    return "text-emerald-400";
+type ScoreTone = {
+  text: string;
+  border: string;
+  badge: string;
+  glow: string;
+  label: string;
+};
+
+function getScoreTone(score: number): ScoreTone {
+  if (score <= 20) {
+    return {
+      text: "text-emerald-400",
+      border: "border-emerald-500/30",
+      badge: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+      glow: "from-emerald-500/20 via-emerald-400/10",
+      label: "LOW RISK",
+    };
   }
-  if (score >= 50) {
-    return "text-yellow-400";
+  if (score <= 45) {
+    return {
+      text: "text-orange-400",
+      border: "border-orange-500/30",
+      badge: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+      glow: "from-orange-500/20 via-orange-400/10",
+      label: "MODERATE RISK",
+    };
   }
-  if (score >= 30) {
-    return "text-orange-400";
-  }
-  return "text-[#ef4444]";
+  return {
+    text: "text-[#ef4444]",
+    border: "border-[#ef4444]/30",
+    badge: "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/40",
+    glow: "from-[#ef4444]/20 via-red-500/10",
+    label: "HIGH RISK",
+  };
 }
 
 export function CitizenViewPage() {
@@ -146,11 +169,36 @@ export function CitizenViewPage() {
   }, [activeJobId]);
 
   const confidenceScore = clamp(Math.round(report?.classification.score ?? 0));
-  const scoreColor = scoreColorClass(confidenceScore);
-  const gaugeNeedleScore = confidenceScore;
+  const scoreTone = getScoreTone(confidenceScore);
+  const scoreColor = scoreTone.text;
+  const gaugeNeedleScore = clamp(confidenceScore);
+  const credibilityScore = clamp(100 - confidenceScore);
   const formattedClassification = formatLabel(report?.classification.label ?? "Unknown");
   const categories = report?.manipulation.categories ?? [];
   const flags = report?.anomalies ?? [];
+  const synthesisScore = useMemo(() => {
+    if (!report) {
+      return 0;
+    }
+
+    const confidences = report.manipulation.breakdown
+      .map((entry) => {
+        if (typeof entry !== "object" || entry === null) {
+          return null;
+        }
+        const confidence = (entry as { confidence?: unknown }).confidence;
+        return typeof confidence === "number" && Number.isFinite(confidence) ? confidence : null;
+      })
+      .filter((value): value is number => value !== null);
+
+    const rationaleStrength = confidences.length
+      ? (confidences.reduce((sum, value) => sum + value, 0) / confidences.length) * 100
+      : confidenceScore;
+    const consistencyPenalty = clamp(flags.length * 7, 0, 25);
+
+    return clamp(Math.round(rationaleStrength * 0.65 + confidenceScore * 0.35 + consistencyPenalty));
+  }, [confidenceScore, flags.length, report]);
+
   const reportText = report?.human_readable_report?.trim() || "No human-readable report available.";
   const forensicPath = activeJobId ? `/forensic-lab?jobId=${encodeURIComponent(activeJobId)}` : "/forensic-lab";
 
@@ -186,7 +234,7 @@ export function CitizenViewPage() {
               onClick={() => navigate(forensicPath)}
               className="bg-[#22d3ee]/10 hover:bg-[#22d3ee]/20 text-[#22d3ee] border border-[#22d3ee]/30"
             >
-              Unlock Full Forensic Evidence
+              View Detailed Analytics
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
@@ -227,118 +275,102 @@ export function CitizenViewPage() {
           {/* Trust Gauge - The Hero Element */}
           <div className="relative mb-16">
             {/* Glow Effect */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#ef4444]/20 via-orange-500/10 to-transparent blur-3xl" />
+            <div className={`absolute inset-0 bg-gradient-to-b ${scoreTone.glow} to-transparent blur-3xl`} />
             
-            <div className="relative bg-[#1e293b]/30 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-12">
+            <div className={`relative bg-[#1e293b]/30 backdrop-blur-xl border rounded-3xl p-12 ${scoreTone.border}`}>
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-white mb-2">Trust Gauge</h3>
-                <p className="text-slate-400 text-sm">How reliable is this content?</p>
+                <h3 className="text-2xl font-bold text-white mb-2">Credibility Gauge</h3>
+                <p className="text-slate-400 text-sm">Professional risk profile from backend analysis</p>
               </div>
 
               {/* Semi-Circle Gauge */}
-              <div className="relative w-full max-w-md mx-auto mb-8">
+              <div className="relative w-full max-w-md mx-auto mb-6">
                 <svg viewBox="0 0 200 120" className="w-full">
+                  <defs>
+                    <linearGradient id="credibilityGauge" x1="20" y1="100" x2="180" y2="100" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#22c55e" />
+                      <stop offset="45%" stopColor="#eab308" />
+                      <stop offset="70%" stopColor="#f97316" />
+                      <stop offset="100%" stopColor="#ef4444" />
+                    </linearGradient>
+                  </defs>
                   {/* Background Arc */}
                   <path
                     d="M 20 100 A 80 80 0 0 1 180 100"
                     fill="none"
-                    stroke="#1e293b"
-                    strokeWidth="20"
+                    stroke="#0f172a"
+                    strokeWidth="24"
                     strokeLinecap="round"
                   />
                   
-                  {/* Colored Segments */}
-                  {/* Red Zone (0-30) */}
+                  {/* Gradient Arc */}
                   <path
-                    d="M 20 100 A 80 80 0 0 1 62 35"
+                    d="M 20 100 A 80 80 0 0 1 180 100"
                     fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="20"
+                    stroke="url(#credibilityGauge)"
+                    strokeWidth="18"
                     strokeLinecap="round"
                   />
-                  
-                  {/* Orange Zone (30-60) */}
-                  <path
-                    d="M 62 35 A 80 80 0 0 1 100 20"
-                    fill="none"
-                    stroke="#f97316"
-                    strokeWidth="20"
-                    strokeLinecap="round"
-                  />
-                  
-                  {/* Yellow Zone (60-80) */}
-                  <path
-                    d="M 100 20 A 80 80 0 0 1 138 35"
-                    fill="none"
-                    stroke="#eab308"
-                    strokeWidth="20"
-                    strokeLinecap="round"
-                  />
-                  
-                  {/* Green Zone (80-100) */}
-                  <path
-                    d="M 138 35 A 80 80 0 0 1 180 100"
-                    fill="none"
-                    stroke="#22c55e"
-                    strokeWidth="20"
-                    strokeLinecap="round"
-                  />
-                  
+
+                  {[0, 25, 50, 75, 100].map((tick) => {
+                    const angle = (-180 + tick * 1.8) * (Math.PI / 180);
+                    const x1 = 100 + Math.cos(angle) * 70;
+                    const y1 = 100 + Math.sin(angle) * 70;
+                    const x2 = 100 + Math.cos(angle) * 78;
+                    const y2 = 100 + Math.sin(angle) * 78;
+                    return <line key={tick} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#64748b" strokeWidth="1.5" />;
+                  })}
+
                   {/* Needle */}
-                  <g transform={`rotate(${-90 + (gaugeNeedleScore * 1.8)} 100 100)`}>
+                  <g transform={`rotate(${-180 + gaugeNeedleScore * 1.8} 100 100)`}>
                     <line
                       x1="100"
                       y1="100"
                       x2="100"
-                      y2="40"
-                      stroke="#22d3ee"
-                      strokeWidth="3"
+                      y2="30"
+                      stroke="#e2e8f0"
+                      strokeWidth="2.5"
                       strokeLinecap="round"
                     />
-                    <circle cx="100" cy="100" r="8" fill="#22d3ee" />
+                    <circle cx="100" cy="100" r="9" fill="#e2e8f0" />
                     <circle cx="100" cy="100" r="4" fill="#020617" />
                   </g>
                   
                   {/* Center Labels */}
                   <text x="20" y="115" fill="#94a3b8" fontSize="10" fontFamily="monospace">
-                    DANGER
-                  </text>
-                  <text x="160" y="115" fill="#94a3b8" fontSize="10" fontFamily="monospace" textAnchor="end">
                     SAFE
                   </text>
+                  <text x="160" y="115" fill="#94a3b8" fontSize="10" fontFamily="monospace" textAnchor="end">
+                    DANGER
+                  </text>
                 </svg>
+              </div>
 
-                {/* Score Display */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-8">
-                  <div className="text-center">
-                    <div className={`text-6xl font-bold mb-2 ${scoreColor}`}>
-                      {confidenceScore}%
-                    </div>
-                    <div className={`text-lg font-semibold mb-1 ${scoreColor}`}>
-                      {formattedClassification.toUpperCase()}
-                    </div>
-                    <div className="text-sm text-slate-400 font-mono">
-                      Backend Confidence Score
-                    </div>
-                  </div>
+              {/* Score Display */}
+              <div className="text-center mb-6">
+                <div className={`text-5xl md:text-6xl font-bold mb-2 ${scoreColor}`}>
+                  {confidenceScore}%
+                </div>
+                <div className={`text-lg font-semibold mb-1 ${scoreColor}`}>
+                  {scoreTone.label}
+                </div>
+                <div className="text-sm text-slate-400 font-mono">
+                  Manipulation Score
                 </div>
               </div>
 
-              {/* Traffic Light Indicator */}
-              <div className="flex items-center justify-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className={`h-6 w-6 rounded-full ${confidenceScore < 30 ? "bg-[#ef4444] shadow-[0_0_20px_rgba(239,68,68,0.5)]" : "bg-slate-700"}`} />
-                  <span className={`text-sm font-mono ${confidenceScore < 30 ? "text-slate-400" : "text-slate-600"}`}>LOW</span>
+              <div className="grid md:grid-cols-3 gap-3">
+                <div className="bg-[#020617]/60 border border-slate-700/50 rounded-xl p-4 text-center">
+                  <div className={`text-3xl font-bold ${scoreColor}`}>{confidenceScore}%</div>
+                  <div className="text-xs text-slate-400 font-mono mt-1">MANIPULATION</div>
                 </div>
-                <div className="h-6 w-px bg-slate-700" />
-                <div className="flex items-center gap-2">
-                  <div className={`h-6 w-6 rounded-full ${confidenceScore >= 30 && confidenceScore < 75 ? "bg-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.45)]" : "bg-slate-700"}`} />
-                  <span className={`text-sm font-mono ${confidenceScore >= 30 && confidenceScore < 75 ? "text-slate-400" : "text-slate-600"}`}>MEDIUM</span>
+                <div className="bg-[#020617]/60 border border-slate-700/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-cyan-300">{credibilityScore}%</div>
+                  <div className="text-xs text-slate-400 font-mono mt-1">CREDIBILITY</div>
                 </div>
-                <div className="h-6 w-px bg-slate-700" />
-                <div className="flex items-center gap-2">
-                  <div className={`h-6 w-6 rounded-full ${confidenceScore >= 75 ? "bg-[#22c55e] shadow-[0_0_20px_rgba(34,197,94,0.45)]" : "bg-slate-700"}`} />
-                  <span className={`text-sm font-mono ${confidenceScore >= 75 ? "text-slate-400" : "text-slate-600"}`}>HIGH</span>
+                <div className="bg-[#020617]/60 border border-slate-700/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-purple-300">{synthesisScore}%</div>
+                  <div className="text-xs text-slate-400 font-mono mt-1">SYNTHESIS SCORE</div>
                 </div>
               </div>
             </div>
@@ -356,7 +388,7 @@ export function CitizenViewPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
-                      <h4 className="text-xl font-bold text-white">Human-Readable Report</h4>
+                      <h4 className="text-xl font-bold text-white">Report Overview</h4>
                       <span className="px-3 py-1 bg-[#ef4444]/20 border border-[#ef4444]/40 rounded-full text-xs font-bold text-[#ef4444] font-mono">
                         BACKEND OUTPUT
                       </span>
@@ -443,7 +475,7 @@ export function CitizenViewPage() {
               className="bg-gradient-to-r from-[#22d3ee] to-cyan-600 hover:from-[#22d3ee]/90 hover:to-cyan-600/90 text-[#020617] px-8 py-6 text-lg font-bold rounded-xl shadow-[0_0_30px_rgba(34,211,238,0.3)] hover:shadow-[0_0_50px_rgba(34,211,238,0.5)] transition-all"
             >
               <Shield className="h-5 w-5 mr-2" />
-              Unlock Full Forensic Evidence
+              View Detailed Analytics
             </Button>
             <p className="text-sm text-slate-500 mt-4 font-mono">
               See detailed analysis with timestamps and expert-level data
