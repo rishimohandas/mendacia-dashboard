@@ -174,6 +174,32 @@ function severityDotClass(severity: UiSeverity): string {
   return "bg-blue-500";
 }
 
+function getSeverityColor(severity: UiSeverity): string {
+  if (severity === "critical") {
+    return "text-[#ef4444]";
+  }
+  if (severity === "high") {
+    return "text-orange-400";
+  }
+  if (severity === "medium") {
+    return "text-yellow-400";
+  }
+  return "text-emerald-400";
+}
+
+function getSeverityBg(severity: UiSeverity): string {
+  if (severity === "critical") {
+    return "bg-[#ef4444]/20 border-[#ef4444]/50";
+  }
+  if (severity === "high") {
+    return "bg-orange-500/20 border-orange-500/50";
+  }
+  if (severity === "medium") {
+    return "bg-yellow-500/20 border-yellow-500/50";
+  }
+  return "bg-emerald-500/20 border-emerald-500/50";
+}
+
 export function ForensicLabPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -184,10 +210,18 @@ export function ForensicLabPage() {
   }, [location.search]);
 
   const isLiveMode = jobId.length > 0;
+  const citizenViewPath = jobId ? `/citizen-view?jobId=${encodeURIComponent(jobId)}` : "/citizen-view";
   const [report, setReport] = useState<ForensicReport | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [errorText, setErrorText] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!jobId || typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem("mendacia:lastJobId", jobId);
+  }, [jobId]);
 
   useEffect(() => {
     if (!isLiveMode) {
@@ -276,9 +310,8 @@ export function ForensicLabPage() {
 
   const trustScore = clamp(Math.round(report?.classification.score ?? 84));
   const dominantSeverity = getDominantSeverity(report);
-  const verdictHeadline = report
-    ? (report.classification.label || "unknown").replace(/[-_]/g, " ").toUpperCase()
-    : "HIGHLY MANIPULATED: SYSTEMATIC NARRATIVE DISTORTION";
+  const severityColorClass = getSeverityColor(dominantSeverity);
+  const severityBgClass = getSeverityBg(dominantSeverity);
 
   const radarData = useMemo<RadarPoint[]>(() => {
     if (!report) {
@@ -374,7 +407,7 @@ export function ForensicLabPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate("/citizen-view")}
+                onClick={() => navigate(citizenViewPath)}
                 className="text-slate-400 hover:text-white hover:bg-[#1e293b]/50"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
@@ -550,27 +583,27 @@ export function ForensicLabPage() {
           {/* Dramatic Glow */}
           <div className="absolute -inset-1 bg-gradient-to-r from-[#ef4444] via-orange-500 to-[#ef4444] rounded-2xl opacity-30 blur-xl" />
 
-          <div className="relative bg-gradient-to-br from-[#ef4444]/20 to-[#ef4444]/5 backdrop-blur-xl border-2 border-[#ef4444]/50 rounded-2xl p-8">
+          <div className={`relative backdrop-blur-xl border-2 rounded-2xl p-8 ${severityBgClass}`}>
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-xl bg-[#ef4444]/30 flex items-center justify-center">
-                    <AlertCircle className="h-7 w-7 text-[#ef4444]" />
+                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${severityBgClass}`}>
+                    <AlertCircle className={`h-7 w-7 ${severityColorClass}`} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-[#ef4444] mb-1">FINAL VERDICT</h3>
+                    <h3 className={`text-2xl font-bold mb-1 ${severityColorClass}`}>FINAL VERDICT</h3>
                     <p className="text-sm text-slate-400 font-mono">Expert System Analysis</p>
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-5xl font-bold text-[#ef4444] mb-1">{trustScore}%</div>
+                <div className={`text-5xl font-bold mb-1 ${severityColorClass}`}>{trustScore}%</div>
                 <div className="text-sm text-slate-400 font-mono">MANIPULATION SCORE</div>
               </div>
             </div>
 
-            <div className="bg-[#020617]/50 border border-[#ef4444]/30 rounded-xl p-6 mb-6">
-              <h4 className="text-xl font-bold text-white mb-4">{verdictHeadline}</h4>
+            <div className={`bg-[#020617]/50 border rounded-xl p-6 mb-6 ${severityBgClass}`}>
+              <h4 className="text-xl font-bold text-white mb-4">{report?.classification.explanation || primaryExplanation}</h4>
               <p className="text-slate-300 leading-relaxed mb-4">
                 {primaryExplanation} Analysis identified{" "}
                 <strong className="text-[#ef4444]">{detectedTechniqueCount} distinct manipulation techniques</strong> with
@@ -587,22 +620,34 @@ export function ForensicLabPage() {
             <div className="grid md:grid-cols-3 gap-4">
               <div className="bg-[#020617]/50 border border-slate-700/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <XCircle className="h-5 w-5 text-[#ef4444]" />
-                  <span className="text-sm font-semibold text-[#ef4444]">HIGH RISK</span>
+                  {dominantSeverity === "low" ? (
+                    <CheckCircle2 className={`h-5 w-5 ${severityColorClass}`} />
+                  ) : (
+                    <XCircle className={`h-5 w-5 ${severityColorClass}`} />
+                  )}
+                  <span className={`text-sm font-semibold ${severityColorClass}`}>
+                    {dominantSeverity === "low" ? "LOW SEVERITY" : `${dominantSeverity.toUpperCase()} RISK`}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400">{report?.manipulation.categories[0] || "Emotional Manipulation"}</p>
               </div>
               <div className="bg-[#020617]/50 border border-slate-700/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <XCircle className="h-5 w-5 text-orange-400" />
-                  <span className="text-sm font-semibold text-orange-400">HIGH RISK</span>
+                  {dominantSeverity === "low" ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className={`h-5 w-5 ${severityColorClass}`} />
+                  )}
+                  <span className={`text-sm font-semibold ${dominantSeverity === "low" ? "text-emerald-400" : severityColorClass}`}>
+                    {dominantSeverity === "low" ? "PASSING CHECK" : `${dominantSeverity.toUpperCase()} RISK`}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400">{report?.anomalies[0]?.type || "Visual Framing Issues"}</p>
               </div>
               <div className="bg-[#020617]/50 border border-slate-700/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
-                  <span className="text-sm font-semibold text-cyan-400">ANALYSIS COMPLETE</span>
+                  <CheckCircle2 className={`h-5 w-5 ${severityColorClass}`} />
+                  <span className={`text-sm font-semibold ${severityColorClass}`}>ANALYSIS COMPLETE</span>
                 </div>
                 <p className="text-xs text-slate-400">{trustScore}% Confidence Level</p>
               </div>
@@ -613,7 +658,7 @@ export function ForensicLabPage() {
         {/* Footer Actions */}
         <div className="flex gap-4 mt-8">
           <Button
-            onClick={() => navigate("/citizen-view")}
+            onClick={() => navigate(citizenViewPath)}
             variant="outline"
             className="flex-1 border-slate-700 text-slate-300 hover:bg-[#1e293b]/50"
           >

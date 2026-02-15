@@ -25,6 +25,9 @@ export function HomePage() {
     setIsUploading(true);
     try {
       const { job_id } = await uploadVideo(file);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mendacia:lastJobId", job_id);
+      }
       navigate(`/forensic-lab?jobId=${encodeURIComponent(job_id)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed. Please try again.";

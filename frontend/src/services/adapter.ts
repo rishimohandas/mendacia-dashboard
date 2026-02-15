@@ -29,6 +29,8 @@ export interface ForensicReport {
     description: string;
     severity: Severity;
   }>;
+  human_readable_report: string;
+  ethical_note: string;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -345,11 +347,16 @@ export function adaptForensicReport(apiData: unknown): ForensicReport {
     "",
   );
 
+  const humanReadableReport = asString(root.human_readable_report, "");
+  const ethicalNote = asString(root.ethical_note, "");
+
   const categories = toStringArray(
     manipulationBlock.categories ?? root.manipulation_categories_detected ?? moduleA.manipulation_categories_detected,
   );
 
-  const breakdown = toObjectArray(manipulationBlock.breakdown ?? root.breakdown ?? moduleA.rationales);
+  const breakdown = toObjectArray(
+    manipulationBlock.breakdown ?? root.manipulation_breakdown ?? root.breakdown ?? moduleA.rationales,
+  );
 
   const scenes = rawScenes.map((sceneRaw, index) => {
     const scene = asRecord(sceneRaw);
@@ -408,5 +415,7 @@ export function adaptForensicReport(apiData: unknown): ForensicReport {
     },
     scenes,
     anomalies,
+    human_readable_report: humanReadableReport,
+    ethical_note: ethicalNote,
   };
 }
