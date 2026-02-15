@@ -27,6 +27,8 @@ export function HomePage() {
       const { job_id } = await uploadVideo(file);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("mendacia:lastJobId", job_id);
+        window.localStorage.setItem(`mendacia:jobFilename:${job_id}`, file.name);
+        window.localStorage.setItem("mendacia:lastFilename", file.name);
       }
       navigate(`/citizen-view?jobId=${encodeURIComponent(job_id)}`);
     } catch (error) {
