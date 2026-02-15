@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 from app.engine.consistency import run_module_c
@@ -63,6 +64,8 @@ class PipelineService:
     def __init__(self) -> None:
         self.twelvelabs = TwelveLabsClient()
         self.llm = LLMClient()
+        self.reports_dir = Path(__file__).resolve().parents[2] / "reports"
+        self.reports_dir.mkdir(parents=True, exist_ok=True)
 
     def run(
         self,
@@ -108,6 +111,7 @@ class PipelineService:
             module_b=module_b,
             module_c=module_c,
         )
+        report_artifacts = self._persist_report_artifacts(final_report)
 
         progress_callback(100, "Completed")
         return {
@@ -117,6 +121,7 @@ class PipelineService:
             "moduleB_result": module_b,
             "moduleC_result": module_c,
             "final_report": final_report,
+            "report_artifacts": report_artifacts,
         }
 
     def _prepare_metadata(
@@ -592,6 +597,29 @@ class PipelineService:
             return self._normalize_human_report_text(text)[:2200]
         except Exception:
             return fallback
+
+    def _persist_report_artifacts(self, report: Dict[str, Any]) -> Dict[str, str]:
+        video_id = str(report.get("video_id") or "unknown-video")
+        safe_video_id = re.sub(r"[^a-zA-Z0-9._-]+", "_", video_id)
+        txt_path = self.reports_dir / f"{safe_video_id}.txt"
+        json_path = self.reports_dir / f"{safe_video_id}.json"
+
+        human_text = str(report.get("human_readable_report") or "").strip()
+        summary_lines = [
+            f"Video ID: {video_id}",
+            f"Classification: {report.get('classification', '')}",
+            f"Confidence Score: {report.get('confidence_score', '')}",
+            "",
+            "Human-Readable Report:",
+            human_text or "No narrative report generated.",
+            "",
+            f"Categories: {', '.join(report.get('manipulation_categories_detected', [])) or 'None'}",
+            f"Flags: {len(report.get('inconsistency_flags', []))}",
+        ]
+        txt_path.write_text("\n".join(summary_lines), encoding="utf-8")
+        json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        return {"txt_path": str(txt_path), "json_path": str(json_path)}
 
     def _normalize_human_report_text(self, text: str) -> str:
         cleaned = (text or "").strip()

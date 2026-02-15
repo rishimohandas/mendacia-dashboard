@@ -17,6 +17,7 @@ class TwelveLabsClient:
         self.index_id = os.getenv("TWELVELABS_INDEX_ID", "").strip()
         self.timeout_seconds = int(os.getenv("TWELVELABS_TIMEOUT", "300"))
         self.enable_generate = os.getenv("TWELVELABS_ENABLE_GENERATE", "false").strip().lower() == "true"
+        self.require_generate_index = os.getenv("TWELVELABS_REQUIRE_GENERATE_INDEX", "true").strip().lower() == "true"
 
     def is_configured(self) -> bool:
         return bool(self.api_key)
@@ -25,7 +26,7 @@ class TwelveLabsClient:
         if not self.is_configured():
             raise RuntimeError("TWELVELABS_API_KEY is missing")
 
-        index_id = self.index_id or self._ensure_index()
+        index_id = self._resolve_index_id(require_generate=self.enable_generate and self.require_generate_index)
         task_id = self._upload_video_for_index(index_id=index_id, video_path=video_path)
         task_data = self._poll_task(task_id)
         video_id = (
@@ -62,6 +63,13 @@ class TwelveLabsClient:
             duration_seconds=duration_seconds,
         )
 
+    def _resolve_index_id(self, require_generate: bool) -> str:
+        if self.index_id:
+            if require_generate and not self._index_supports_generate(self.index_id):
+                return self._ensure_index(require_generate=True)
+            return self.index_id
+        return self._ensure_index(require_generate=require_generate)
+
     def _headers(self) -> Dict[str, str]:
         return {"x-api-key": self.api_key}
 
@@ -70,12 +78,12 @@ class TwelveLabsClient:
         headers["Content-Type"] = "application/json"
         return headers
 
-    def _ensure_index(self) -> str:
-        payload = {
-            "index_name": "truthlens-default-index",
-            "models": [{"model_name": "marengo2.7", "model_options": ["visual", "audio"]}],
-            "addons": ["thumbnail"],
-        }
+    def _ensure_index(self, require_generate: bool = False) -> str:
+        index_name = "truthlens-generate-index" if require_generate else "truthlens-default-index"
+        models = [{"model_name": "marengo3.0", "model_options": ["visual", "audio"]}]
+        if require_generate:
+            models.append({"model_name": "pegasus1.2", "model_options": ["visual", "audio"]})
+        payload = {"index_name": index_name, "models": models, "addons": ["thumbnail"]}
         response = requests.post(
             f"{self.BASE_URL_V13}/indexes",
             headers=self._json_headers(),
@@ -83,7 +91,7 @@ class TwelveLabsClient:
             timeout=60,
         )
         if response.status_code == 409:
-            existing = self._find_existing_index("truthlens-default-index")
+            existing = self._find_existing_index(index_name, require_generate=require_generate)
             if existing:
                 return existing
         if response.status_code >= 400:
@@ -98,7 +106,7 @@ class TwelveLabsClient:
                 timeout=60,
             )
             if response.status_code == 409:
-                existing = self._find_existing_index("truthlens-default-index")
+                existing = self._find_existing_index(index_name, require_generate=require_generate)
                 if existing:
                     return existing
         response.raise_for_status()
@@ -605,7 +613,19 @@ class TwelveLabsClient:
                 return [item for item in value if isinstance(item, dict)]
         return []
 
-    def _find_existing_index(self, index_name: str) -> Optional[str]:
+    def _index_supports_generate(self, index_id: str) -> bool:
+        response = requests.get(f"{self.BASE_URL_V13}/indexes/{index_id}", headers=self._headers(), timeout=60)
+        if response.status_code >= 400:
+            return False
+        payload = response.json()
+        models = payload.get("models") or []
+        for model in models:
+            model_name = str(model.get("model_name") or model.get("name") or "").lower()
+            if model_name.startswith("pegasus"):
+                return True
+        return False
+
+    def _find_existing_index(self, index_name: str, require_generate: bool = False) -> Optional[str]:
         for base in (self.BASE_URL_V13, self.BASE_URL_V12):
             response = requests.get(f"{base}/indexes", headers=self._headers(), timeout=60)
             if response.status_code >= 400:
@@ -613,8 +633,17 @@ class TwelveLabsClient:
             data = response.json()
             records = data.get("data") or data.get("indexes") or []
             for item in records:
-                if item.get("index_name") == index_name:
-                    return item.get("id") or item.get("_id")
+                if item.get("index_name") != index_name:
+                    continue
+                if require_generate:
+                    model_records = item.get("models") or []
+                    has_pegasus = any(
+                        str(model.get("model_name") or model.get("name") or "").lower().startswith("pegasus")
+                        for model in model_records
+                    )
+                    if not has_pegasus:
+                        continue
+                return item.get("id") or item.get("_id")
         return None
 
 
