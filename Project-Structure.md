@@ -1,65 +1,58 @@
 # Project Structure
 
 ## Root Directory
-backend/ → API server and AI processing pipeline
-frontend/ → React dashboard UI
-.env → Environment variables (API keys, config)
-README.md → Project documentation
+- `backend/` API server and AI processing pipeline
+- `frontend/` React dashboard UI
+- `.env` and `backend/.env` environment variables (gitignored)
+- `README.md` project status
+- `TEAM_HANDOFF.md` teammate handoff notes
+- `FRONTEND_GUIDELINES.md` frontend implementation guidance
 
 ---
 
-## 🔧 Backend (`/backend`)
+## Backend (`/backend`)
 
-The backend handles video processing, AI analysis, and report generation.
+The backend handles uploads, multimodal analysis orchestration, and forensic report generation.
+
+```text
 backend/
-│
-├── main.py → FastAPI entry point
-├── requirements.txt → Python dependencies
-│
+├── main.py                      # Flask entry point + endpoints + job store
+├── requirements.txt             # Python dependencies
+├── README.md                    # Backend run/setup docs
+├── schema.md                    # Module I/O and final report schema docs
 ├── app/
-│ ├── engine/
-│ │ └── consistency.py → Cross-modal consistency rules
-│ │
-│ ├── models/
-│ │ └── schemas.py → Structured JSON schema definitions
-│ │
-│ └── services/
-│ └── twelvelabs_client.py → TwelveLabs API integration
+│   ├── main.py                  # App import compatibility wrapper
+│   ├── engine/
+│   │   └── consistency.py       # Module C heuristics
+│   ├── models/
+│   │   └── schemas.py           # Pydantic output and module schemas
+│   └── services/
+│       ├── twelvelabs_client.py # TwelveLabs v1.3 integration + normalization
+│       ├── llm_client.py        # Gemini/OpenAI abstraction (Vertex-first for Gemini)
+│       └── pipeline.py          # Module A -> B -> C orchestration
+├── mock/
+│   └── sample_metadata.json     # Deterministic mock pipeline input
+├── uploads/                     # Uploaded mp4 files (runtime)
+└── scripts/
+    └── smoke_test.sh            # Endpoint smoke test helper
+```
 
 ### Backend Responsibilities
-
-- Accept video uploads  
-- Call TwelveLabs for scene and transcript extraction  
-- Run LLM-based narrative analysis  
-- Perform cross-modal consistency checks  
-- Generate structured forensic report JSON  
+- Accept video upload requests.
+- Process jobs asynchronously with progress updates.
+- Query TwelveLabs for metadata (or fallback in mock/sparse modes).
+- Run manipulation taxonomy and claim extraction.
+- Run cross-modal consistency checks.
+- Return strict JSON forensic report output.
 
 ---
 
-## 🎨 Frontend (`/frontend`)
+## Frontend (`/frontend`)
 
-The frontend is a React-based dashboard for displaying forensic analysis results.
-frontend/
-│
-├── src/ → React components and UI logic
-└── package.json → Frontend dependencies
+The frontend should integrate using backend job endpoints, polling, and report rendering.
 
 ### Frontend Responsibilities
-
-- Handle file uploads  
-- Call backend `/analyze` endpoint  
-- Render:
-  - Manipulation breakdown  
-  - Cross-modal inconsistencies  
-  - Confidence score  
-  - Classification explanation  
-
----
-
-## 🔐 Environment Variables
-
-The `.env` file should include:
-TWELVELABS_API_KEY=
-LLM_API_KEY=
-
-⚠ Never commit real API keys.
+- Upload MP4 and optional context.
+- Poll job status until done/error.
+- Render classification, confidence, scenes, and inconsistency flags.
+- Play uploaded video using `/api/video/<job_id>`.

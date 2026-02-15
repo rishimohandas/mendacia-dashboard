@@ -1,65 +1,34 @@
-# Project Structure
+# Mendacia Dashboard
 
-## Root Directory
-backend/ → API server and AI processing pipeline
-frontend/ → React dashboard UI
-.env → Environment variables (API keys, config)
-README.md → Project documentation
+Mendacia is a multimodal media forensics dashboard.
+Current repo status: backend MVP is implemented and frontend can now integrate against stable endpoints.
 
----
+## Current State
+- Backend framework: Flask
+- Processing model: in-memory async job pipeline
+- Pipeline order: TwelveLabs normalize -> Module A -> Module B -> Module C -> Final ForensicReport
+- LLM provider default: Gemini (Vertex endpoint first)
+- Persistence: none (in-memory only, by design for MVP speed)
 
-## 🔧 Backend (`/backend`)
+## Repository Layout
+- `backend/` API server, AI pipeline, schemas, docs, scripts
+- `frontend/` UI app (next stage)
+- `TEAM_HANDOFF.md` teammate onboarding and caveats
+- `FRONTEND_GUIDELINES.md` frontend integration contract
 
-The backend handles video processing, AI analysis, and report generation.
-backend/
-│
-├── main.py → FastAPI entry point
-├── requirements.txt → Python dependencies
-│
-├── app/
-│ ├── engine/
-│ │ └── consistency.py → Cross-modal consistency rules
-│ │
-│ ├── models/
-│ │ └── schemas.py → Structured JSON schema definitions
-│ │
-│ └── services/
-│ └── twelvelabs_client.py → TwelveLabs API integration
+## Backend Endpoints
+- `POST /api/upload`
+- `GET /api/job/<job_id>`
+- `GET /api/report/<job_id>`
+- `GET /api/video/<job_id>`
 
-### Backend Responsibilities
+## What Is Verified
+- Mock mode end-to-end works (`MOCK_MODE=true`).
+- Real non-mock pipeline runs with sample MP4 and returns a valid report shape.
+- Gemini key path works via Vertex endpoint.
 
-- Accept video uploads  
-- Call TwelveLabs for scene and transcript extraction  
-- Run LLM-based narrative analysis  
-- Perform cross-modal consistency checks  
-- Generate structured forensic report JSON  
+## Current Caveat
+In real runs, TwelveLabs may return sparse metadata for some videos; backend then falls back to generic scene chunks so report output remains valid but less detailed.
 
----
-
-## 🎨 Frontend (`/frontend`)
-
-The frontend is a React-based dashboard for displaying forensic analysis results.
-frontend/
-│
-├── src/ → React components and UI logic
-└── package.json → Frontend dependencies
-
-### Frontend Responsibilities
-
-- Handle file uploads  
-- Call backend `/analyze` endpoint  
-- Render:
-  - Manipulation breakdown  
-  - Cross-modal inconsistencies  
-  - Confidence score  
-  - Classification explanation  
-
----
-
-## 🔐 Environment Variables
-
-The `.env` file should include:
-TWELVELABS_API_KEY=
-LLM_API_KEY=
-
-⚠ Never commit real API keys.
+## Quick Start
+See `backend/README.md` for setup, env vars, and test commands.
