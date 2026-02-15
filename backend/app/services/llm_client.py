@@ -27,10 +27,7 @@ class LLMClient:
         last_error: Optional[Exception] = None
         for _ in range(2):
             try:
-                if self.provider == "gemini":
-                    raw = self._call_gemini(system_prompt, user_prompt)
-                else:
-                    raw = self._call_openai(system_prompt, user_prompt)
+                raw = self._call_provider(system_prompt, user_prompt)
 
                 parsed = self._parse_json(raw)
                 if validator:
@@ -40,6 +37,19 @@ class LLMClient:
                 last_error = exc
 
         raise RuntimeError(f"Failed to produce valid JSON from LLM: {last_error}")
+
+    def generate_text(self, system_prompt: str, user_prompt: str) -> str:
+        if not self.is_configured():
+            raise RuntimeError("LLM_API_KEY is not configured")
+        text = self._call_provider(system_prompt, user_prompt).strip()
+        if not text:
+            raise ValueError("Empty LLM text response")
+        return text
+
+    def _call_provider(self, system_prompt: str, user_prompt: str) -> str:
+        if self.provider == "gemini":
+            return self._call_gemini(system_prompt, user_prompt)
+        return self._call_openai(system_prompt, user_prompt)
 
     def _call_openai(self, system_prompt: str, user_prompt: str) -> str:
         url = "https://api.openai.com/v1/chat/completions"

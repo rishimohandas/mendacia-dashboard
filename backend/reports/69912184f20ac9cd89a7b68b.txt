@@ -1,0 +1,11 @@
+Video ID: 69912184f20ac9cd89a7b68b
+Classification: propaganda-likely
+Confidence Score: 55
+
+Human-Readable Report:
+The video has been classified as likely propaganda with a confidence score of 55. This classification is based on the detection of several categories: Context stripping, Fear amplification, and Urgency framing. The analysis suggests that the content may be presenting information in a way that manipulates the audience's perception, potentially by removing crucial context, emphasizing fear, and creating a sense of immediate need for action or belief.
+
+The analysis was limited by sparse visual metadata, as indicated by the 'Limited Scene Evidence' flag. Consequently, cross-modal verification confidence is reduced. The spoken transcript discusses potential conflict with Iran, framing their actions as talk without substance and implying a need for a "deal." The claims identified focus on the perceived inaction of Iran and the potential consequences, contributing to the overall assessment of propaganda likelihood. Without more detailed visual context, it is difficult to definitively ascertain the intent or veracity of the claims made.
+
+Categories: Context stripping, Fear amplification, Urgency framing
+Flags: 1

@@ -12,6 +12,7 @@ ESCALATION_TERMS = {
     "everywhere",
     "burning",
     "collapse",
+    "crisis",
 }
 
 CALM_TERMS = {
@@ -56,6 +57,7 @@ def run_module_c(
     semantic_moments: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     flags: List[Dict[str, Any]] = []
+    sparse_visual_metadata = _is_sparse_visual_metadata(scenes)
 
     for claim in claims:
         claim_text = (claim.get("text") or "").lower()
@@ -67,7 +69,7 @@ def run_module_c(
             flags.append(
                 {
                     "timestamp": float(claim_time),
-                    "flag_type": "Visual–Narrative Escalation Mismatch",
+                    "flag_type": "Visual-Narrative Escalation Mismatch",
                     "description": "Claim language suggests high escalation while visuals appear relatively calm, which may indicate narrative inflation.",
                     "severity": "high",
                 }
@@ -83,7 +85,30 @@ def run_module_c(
                 }
             )
 
-    # Check semantic moments for urgency/fear vs calm visuals.
+        if _contains_any(claim_text, ESCALATION_TERMS) and (
+            "auto-generated fallback segment summary" in scene_text
+            or "transcript-derived fallback segment" in scene_text
+            or not scene_text.strip()
+        ):
+            flags.append(
+                {
+                    "timestamp": float(claim_time),
+                    "flag_type": "Insufficient Visual Corroboration",
+                    "description": "Claim uses escalation language but available visual metadata is sparse, limiting corroboration confidence.",
+                    "severity": "low",
+                }
+            )
+
+    if sparse_visual_metadata and claims:
+        flags.append(
+            {
+                "timestamp": 0.0,
+                "flag_type": "Limited Scene Evidence",
+                "description": "Scene-level visual descriptors are sparse, so cross-modal verification confidence is reduced for this report.",
+                "severity": "low",
+            }
+        )
+
     for moment in semantic_moments:
         query = (moment.get("query") or "").lower()
         if "urgent" in query or "fear" in query:
@@ -94,7 +119,7 @@ def run_module_c(
                 flags.append(
                     {
                         "timestamp": ts,
-                        "flag_type": "Visual–Speech Mismatch",
+                        "flag_type": "Visual-Speech Mismatch",
                         "description": "Detected urgency/fear cue is not strongly supported by nearby visuals and may suggest framing mismatch.",
                         "severity": "low",
                     }
@@ -146,7 +171,25 @@ def _dedupe_flags(flags: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if key in seen:
             continue
         seen.add(key)
-        # Validate each item through model for strictness.
         validated = MismatchFlag.model_validate(flag)
         deduped.append(validated.model_dump())
     return deduped
+
+
+def _is_sparse_visual_metadata(scenes: List[Dict[str, Any]]) -> bool:
+    if not scenes:
+        return True
+    populated = 0
+    for scene in scenes:
+        summary = str(scene.get("visual_summary") or "").strip().lower()
+        objects = scene.get("detected_objects") or []
+        if (
+            summary
+            and "auto-generated fallback segment summary" not in summary
+            and "transcript-derived fallback segment" not in summary
+        ):
+            populated += 1
+            continue
+        if isinstance(objects, list) and len(objects) >= 2:
+            populated += 1
+    return populated < max(1, len(scenes) // 2)
