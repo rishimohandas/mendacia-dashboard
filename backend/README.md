@@ -10,6 +10,9 @@
 4. Run server:
    - `python main.py`
 
+Backend-only one-command start:
+- `./scripts/start_backend.sh`
+
 Server runs at `http://localhost:8000`.
 
 ## Environment Variables
@@ -39,16 +42,35 @@ MOCK_MODE=true
 
 ### `POST /api/upload`
 Multipart fields:
-- `video` (mp4, required)
+- `video` (mp4, optional)
+- `document` (txt/pdf, optional)
+- `text_content` (raw text string, optional)
 - `context_text` (optional)
 - `duration_seconds` (optional, default `150`)
 
-Example:
+Provide exactly one primary input: `video`, `document`, or `text_content`.
+
+Video example:
 ```bash
 curl -X POST http://localhost:8000/api/upload \
   -F "video=@/absolute/path/video.mp4" \
   -F "context_text=Optional article context" \
   -F "duration_seconds=150"
+```
+
+Document example:
+```bash
+curl -X POST http://localhost:8000/api/upload \
+  -F "document=@/absolute/path/article.pdf" \
+  -F "context_text=Optional context" \
+  -F "duration_seconds=150"
+```
+
+Inline text example:
+```bash
+curl -X POST http://localhost:8000/api/upload \
+  -F "text_content=The speaker claims the situation is in total chaos." \
+  -F "context_text=Optional context"
 ```
 
 Response:
@@ -71,7 +93,7 @@ curl http://localhost:8000/api/report/<job_id>
 ```
 
 ### `GET /api/video/<job_id>`
-Streams uploaded mp4.
+Streams uploaded mp4 when the job input was a video.
 
 ```bash
 curl -L http://localhost:8000/api/video/<job_id> -o out.mp4

@@ -2,7 +2,12 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+try:
+    from pypdf import PdfReader
+except Exception:  # noqa: BLE001
+    PdfReader = None
 
 from app.engine.consistency import run_module_c
 from app.models.schemas import (
@@ -69,7 +74,8 @@ class PipelineService:
 
     def run(
         self,
-        video_path: str,
+        input_type: str,
+        input_path: Optional[str],
         context_text: str,
         duration_seconds: int,
         progress_callback: Callable[[int, str], None],
@@ -78,15 +84,19 @@ class PipelineService:
 
         progress_callback(10, "Preparing metadata")
         normalized_metadata, twelvelabs_raw = self._prepare_metadata(
-            video_path=video_path,
+            input_type=input_type,
+            input_path=input_path,
             duration_seconds=duration_seconds,
             mock_mode=mock_mode,
+            context_text=context_text,
         )
 
         transcript = normalized_metadata.get("transcript", [])
         scenes = normalized_metadata.get("scenes", [])
         semantic_moments = normalized_metadata.get("semantic_moments", [])
-        deterministic_mode = bool(mock_mode or not self.twelvelabs.is_configured())
+        deterministic_mode = bool(
+            mock_mode or (input_type == "video" and not self.twelvelabs.is_configured())
+        )
 
         progress_callback(35, "Running Module A")
         module_a = self._run_module_a(
@@ -106,6 +116,7 @@ class PipelineService:
         progress_callback(90, "Assembling final report")
         final_report = self._build_final_report(
             video_id=normalized_metadata.get("video_id") or "",
+            input_type=input_type,
             scenes=scenes,
             module_a=module_a,
             module_b=module_b,
@@ -126,22 +137,165 @@ class PipelineService:
 
     def _prepare_metadata(
         self,
-        video_path: str,
+        input_type: str,
+        input_path: Optional[str],
         duration_seconds: int,
         mock_mode: bool,
+        context_text: str,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        if mock_mode or not self.twelvelabs.is_configured():
-            normalized = load_mock_metadata()
-            normalized["video_id"] = normalized.get("video_id") or "mock-video"
-            normalized["scenes"] = self._limit_scenes(normalized.get("scenes", []), duration_seconds)
-            return normalized, {"source": "mock"}
+        if input_type == "video":
+            if not input_path:
+                raise ValueError("Missing video input path")
+            if mock_mode or not self.twelvelabs.is_configured():
+                normalized = load_mock_metadata()
+                normalized["video_id"] = normalized.get("video_id") or "mock-video"
+                normalized["scenes"] = self._limit_scenes(normalized.get("scenes", []), duration_seconds)
+                return normalized, {"source": "mock"}
 
-        normalized = self.twelvelabs.analyze_video(
-            video_path=video_path,
+            normalized = self.twelvelabs.analyze_video(
+                video_path=input_path,
+                duration_seconds=duration_seconds,
+            )
+            normalized["scenes"] = self._limit_scenes(normalized.get("scenes", []), duration_seconds)
+            return normalized, normalized.get("raw", {})
+
+        if not input_path:
+            raise ValueError("Missing document/text input path")
+        normalized = self._build_text_normalized_metadata(
+            input_type=input_type,
+            input_path=input_path,
             duration_seconds=duration_seconds,
+            context_text=context_text,
         )
-        normalized["scenes"] = self._limit_scenes(normalized.get("scenes", []), duration_seconds)
-        return normalized, normalized.get("raw", {})
+        return normalized, {"source": f"{input_type}-upload"}
+
+    def _build_text_normalized_metadata(
+        self,
+        input_type: str,
+        input_path: str,
+        duration_seconds: int,
+        context_text: str,
+    ) -> Dict[str, Any]:
+        extracted_text = self._extract_text_payload(input_type=input_type, input_path=input_path)
+        if context_text.strip():
+            extracted_text = f"{context_text.strip()}\n\n{extracted_text}".strip()
+
+        transcript = self._text_to_transcript(extracted_text, duration_seconds=duration_seconds)
+        scenes = self._text_to_scenes(transcript, duration_seconds=duration_seconds)
+        semantic_moments = self._text_to_semantic_moments(transcript)
+        return {
+            "video_id": Path(input_path).stem or "text-upload",
+            "transcript": transcript,
+            "scenes": scenes,
+            "semantic_moments": semantic_moments,
+            "raw": {"source": input_type, "path": input_path},
+        }
+
+    def _extract_text_payload(self, input_type: str, input_path: str) -> str:
+        path = Path(input_path)
+        if input_type == "pdf":
+            if PdfReader is None:
+                raise RuntimeError("pypdf is required for PDF uploads. Install dependencies from requirements.txt")
+            reader = PdfReader(str(path))
+            pages: List[str] = []
+            for page in reader.pages:
+                content = page.extract_text() or ""
+                if content.strip():
+                    pages.append(content.strip())
+            text = "\n\n".join(pages).strip()
+            if not text:
+                raise ValueError("PDF did not contain extractable text")
+            return text
+
+        text = path.read_text(encoding="utf-8", errors="ignore").strip()
+        if not text:
+            raise ValueError("Uploaded text document is empty")
+        return text
+
+    def _text_to_transcript(self, text: str, duration_seconds: int) -> List[Dict[str, Any]]:
+        cleaned = re.sub(r"\s+", " ", text).strip()
+        if not cleaned:
+            return []
+
+        parts = [chunk.strip() for chunk in re.split(r"(?<=[.!?])\s+", cleaned) if chunk.strip()]
+        if not parts:
+            parts = [cleaned]
+
+        transcript: List[Dict[str, Any]] = []
+        cursor = 0.0
+        for part in parts:
+            if cursor >= duration_seconds:
+                break
+            word_count = max(1, len(part.split()))
+            segment_len = float(min(12, max(4, int(word_count / 2.8))))
+            start = cursor
+            end = min(float(duration_seconds), start + segment_len)
+            transcript.append({"start": start, "end": end, "text": part})
+            cursor = end
+        return transcript
+
+    def _text_to_scenes(
+        self,
+        transcript: List[Dict[str, Any]],
+        duration_seconds: int,
+    ) -> List[Dict[str, Any]]:
+        if not transcript:
+            return [
+                {
+                    "scene_number": 1,
+                    "start_time": 0.0,
+                    "end_time": min(10.0, float(duration_seconds)),
+                    "visual_summary": "Text-only upload. No visual scene evidence is available for cross-modal checks.",
+                    "spoken_transcript": "",
+                    "detected_objects": [],
+                }
+            ]
+
+        scenes: List[Dict[str, Any]] = []
+        chunk_size = 2
+        for i in range(0, len(transcript), chunk_size):
+            segment = transcript[i : i + chunk_size]
+            start = float(segment[0]["start"])
+            end = float(segment[-1]["end"])
+            joined = " ".join(str(item.get("text") or "") for item in segment).strip()
+            summary = (
+                "Text-derived segment summary (no visual evidence): "
+                f"{joined[:220]}{'...' if len(joined) > 220 else ''}"
+            )
+            scenes.append(
+                {
+                    "scene_number": len(scenes) + 1,
+                    "start_time": start,
+                    "end_time": min(end, float(duration_seconds)),
+                    "visual_summary": summary,
+                    "spoken_transcript": joined,
+                    "detected_objects": [],
+                }
+            )
+        return scenes[:10]
+
+    def _text_to_semantic_moments(self, transcript: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        moments: List[Dict[str, Any]] = []
+        patterns = [
+            ("Where does the speaker make a strong claim?", {"must", "always", "never", "prove", "clearly"}),
+            ("Where does the tone become urgent or fearful?", {"urgent", "danger", "fear", "immediately", "crisis"}),
+            ("Where are crowds, police, or conflict visible?", {"crowd", "police", "conflict", "riot", "violence"}),
+            ("Where is on-screen text reinforcing a message?", {"headline", "text", "banner", "caption", "slogan"}),
+        ]
+
+        for item in transcript:
+            text = str(item.get("text") or "").lower()
+            for query, terms in patterns:
+                if any(term in text for term in terms):
+                    moments.append(
+                        {
+                            "query": query,
+                            "start": float(item.get("start") or 0.0),
+                            "end": float(item.get("end") or 0.0),
+                            "text": str(item.get("text") or "")[:240],
+                        }
+                    )
+        return moments[:20]
 
     def _run_module_a(
         self,
@@ -271,6 +425,7 @@ class PipelineService:
     def _build_final_report(
         self,
         video_id: str,
+        input_type: str,
         scenes: List[Dict[str, Any]],
         module_a: Dict[str, Any],
         module_b: Dict[str, Any],
@@ -285,6 +440,7 @@ class PipelineService:
         confidence = self._score_confidence(flags, module_a)
         human_report = self._generate_human_readable_report(
             video_id=video_id or "unknown-video",
+            input_type=input_type,
             classification=classification,
             confidence=confidence,
             categories=categories,
@@ -554,6 +710,7 @@ class PipelineService:
     def _generate_human_readable_report(
         self,
         video_id: str,
+        input_type: str,
         classification: str,
         confidence: int,
         categories: List[str],
@@ -561,8 +718,9 @@ class PipelineService:
         scenes: List[Dict[str, Any]],
         claims: List[Dict[str, Any]],
     ) -> str:
+        content_label = "video" if input_type == "video" else "document/text input"
         fallback = (
-            f"SIREN analyzed video {video_id}. Classification: {classification} "
+            f"SIREN analyzed {content_label} {video_id}. Classification: {classification} "
             f"(confidence {confidence}/100). Detected manipulation categories: "
             f"{', '.join(categories) if categories else 'none'}. "
             f"Cross-modal inconsistency flags: {len(flags)}. "
@@ -578,6 +736,7 @@ class PipelineService:
         user_prompt = json.dumps(
             {
                 "video_id": video_id,
+                "content_type": input_type,
                 "classification": classification,
                 "confidence_score": confidence,
                 "detected_categories": categories,
@@ -586,6 +745,7 @@ class PipelineService:
                 "sample_claims": claims[:4],
                 "instructions": [
                     "Write 2 short paragraphs.",
+                    "Use content-type-aware wording: if not video, do not refer to visuals as directly observed footage.",
                     "Explain what was detected and why.",
                     "Mention uncertainty/limitations if evidence is sparse.",
                     "Do not claim objective truth/falsity.",

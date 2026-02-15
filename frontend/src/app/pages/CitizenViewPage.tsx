@@ -105,12 +105,12 @@ export function CitizenViewPage() {
 
       isRequestInFlight = true;
       try {
-        const { status } = await pollJobStatus(activeJobId);
+        const { status, message } = await pollJobStatus(activeJobId);
         const normalizedStatus = status.toLowerCase();
-        setStatusText(`Analysis status: ${status}`);
+        setStatusText(message ? `Analysis status: ${status} - ${message}` : `Analysis status: ${status}`);
 
         if (failedStatuses.has(normalizedStatus)) {
-          throw new Error(`Analysis failed with status: ${status}`);
+          throw new Error(message ? `Analysis failed: ${message}` : `Analysis failed with status: ${status}`);
         }
 
         if (completedStatuses.has(normalizedStatus)) {
@@ -325,7 +325,7 @@ export function CitizenViewPage() {
                   })}
 
                   {/* Needle */}
-                  <g transform={`rotate(${-180 + gaugeNeedleScore * 1.8} 100 100)`}>
+                  <g transform={`rotate(${-90 + gaugeNeedleScore * 1.8} 100 100)`}>
                     <line
                       x1="100"
                       y1="100"
