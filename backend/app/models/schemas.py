@@ -19,15 +19,6 @@ class MismatchFlag(BaseModel):
     severity: str
 
 
-class ForensicReport(BaseModel):
-    video_id: str
-    confidence_score: int
-    classification: str
-    manipulation_categories_detected: List[str]
-    scenes: List[SceneMetadata]
-    inconsistency_flags: List[MismatchFlag]
-
-
 class ModuleARationale(BaseModel):
     category: str
     evidence: str
@@ -38,6 +29,19 @@ class ModuleARationale(BaseModel):
 class ModuleAResult(BaseModel):
     manipulation_categories_detected: List[str]
     rationales: List[ModuleARationale]
+
+
+class ForensicReport(BaseModel):
+    video_id: str
+    confidence_score: int
+    classification: str
+    classification_explanation: str
+    ethical_note: str
+    human_readable_report: str
+    manipulation_categories_detected: List[str]
+    manipulation_breakdown: List[ModuleARationale]
+    scenes: List[SceneMetadata]
+    inconsistency_flags: List[MismatchFlag]
 
 
 class ClaimItem(BaseModel):
