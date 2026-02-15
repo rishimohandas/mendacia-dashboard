@@ -1,0 +1,83 @@
+{
+  "video_id": "69912184f20ac9cd89a7b68b",
+  "confidence_score": 55,
+  "classification": "propaganda-likely",
+  "classification_explanation": "Multiple manipulation indicators were detected (3 categories, 1 inconsistency flags), suggesting elevated persuasion risk.",
+  "ethical_note": "Decision-support output only. SIREN highlights potential persuasion and inconsistency signals; it does not determine objective truth.",
+  "human_readable_report": "The video has been classified as likely propaganda with a confidence score of 55. This classification is based on the detection of several categories: Context stripping, Fear amplification, and Urgency framing. The analysis suggests that the content may be presenting information in a way that manipulates the audience's perception, potentially by removing crucial context, emphasizing fear, and creating a sense of immediate need for action or belief.\n\nThe analysis was limited by sparse visual metadata, as indicated by the 'Limited Scene Evidence' flag. Consequently, cross-modal verification confidence is reduced. The spoken transcript discusses potential conflict with Iran, framing their actions as talk without substance and implying a need for a \"deal.\" The claims identified focus on the perceived inaction of Iran and the potential consequences, contributing to the overall assessment of propaganda likelihood. Without more detailed visual context, it is difficult to definitively ascertain the intent or veracity of the claims made.",
+  "manipulation_categories_detected": [
+    "Context stripping",
+    "Fear amplification",
+    "Urgency framing"
+  ],
+  "manipulation_breakdown": [
+    {
+      "category": "Fear amplification",
+      "evidence": "m32.43-m36.59",
+      "why": "The speaker describes graphic imagery of violence ('legs blown off arms blown off faces blown off') to evoke fear and distress.",
+      "confidence": 0.85
+    },
+    {
+      "category": "Urgency framing",
+      "evidence": "m17.70-m21.07",
+      "why": "The speaker asks 'When are those talks, Mr. President? When are those talks?' implying a need for immediate action or resolution.",
+      "confidence": 0.75
+    },
+    {
+      "category": "Context stripping",
+      "evidence": "m28.0-m34.75",
+      "why": "The speaker states 'they've been talking and talking and talking... we've lost a lot of lives while they talk' which omits the specific context of the talks and their potential benefits, focusing only on the negative outcome.",
+      "confidence": 0.7
+    }
+  ],
+  "scenes": [
+    {
+      "scene_number": 1,
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "visual_summary": "Transcript-derived fallback segment (visual metadata unavailable).",
+      "spoken_transcript": "What can Iran do to avoid attack? They give us the deal that they should have given us the first time. If they give us the right deal, we won't do that. But, you know, historically, they haven't done that. I will say they want to talk, but so far they do a lot of talking and no action. When are those talks, Mr. President? When are those talks? They've already started. Do you want regime change in Iran? Well, it seems like that would be the best thing that could happen for 47 years. they've been talking and talking and talking in the",
+      "detected_objects": []
+    },
+    {
+      "scene_number": 2,
+      "start_time": 30.0,
+      "end_time": 60.0,
+      "visual_summary": "Transcript-derived fallback segment (visual metadata unavailable).",
+      "spoken_transcript": "the meantime we've lost a lot of lives while they talk and legs blown off arms blown off faces blown off has been going on for a long time so let's see what happens in the meantime we have meantime we have tremendous power has arrived and additional power as you know and other carriers going out shortly so we'll see it out if we could get it settled for once and for all that would be good Who would you want to take over? I don't want to talk about that.",
+      "detected_objects": []
+    },
+    {
+      "scene_number": 3,
+      "start_time": 60.0,
+      "end_time": 90.0,
+      "visual_summary": "Transcript-derived fallback segment (visual metadata unavailable).",
+      "spoken_transcript": "There are people.",
+      "detected_objects": []
+    },
+    {
+      "scene_number": 4,
+      "start_time": 90.0,
+      "end_time": 120.0,
+      "visual_summary": "Transcript-derived fallback segment (visual metadata unavailable).",
+      "spoken_transcript": "",
+      "detected_objects": []
+    },
+    {
+      "scene_number": 5,
+      "start_time": 120.0,
+      "end_time": 150.0,
+      "visual_summary": "Transcript-derived fallback segment (visual metadata unavailable).",
+      "spoken_transcript": "",
+      "detected_objects": []
+    }
+  ],
+  "inconsistency_flags": [
+    {
+      "timestamp": 0.0,
+      "flag_type": "Limited Scene Evidence",
+      "description": "Scene-level visual descriptors are sparse, so cross-modal verification confidence is reduced for this report.",
+      "severity": "low"
+    }
+  ]
+}
